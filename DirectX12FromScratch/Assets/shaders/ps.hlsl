@@ -22,18 +22,54 @@ float3 computePointLight(float3 materialColor, Light light, PSInput input)
     float   spec = pow(max(dot(viewDir, reflectionDirection), 0.0), 32.0f/* TO-DO: Replace by shininess */);
     float3  specular = light.specular * spec * materialColor; // TO-DO: Use ks
 
-    // TO-DO: Compute attenuation
-
-    return (ambient + diffuse + specular);
+      // TO-DO: Compute attenuation
+	float3	lightToPosition = position - light.position;
+	float	distance = sqrtf(dot(lightToPosition, lightToPosition));
+	float	attenuationFactor = 1 / (light.constantAttenuation + light.linearAttenuation * distance + light.quadraticAttenuation * pow(distance, 2.0));
+    return (ambient + attenuationFactor * ( diffuse + specular)); // TO-DO add Ke
 }
+
+
+float smoothStep(float min, float max, float x)
+{
+	if (x < min)
+	{
+		return (0.0f);
+	}
+	else if (x >= max)
+	{
+		return (1.0f);
+	}
+	else
+	{
+		return (-2.0f * pow((x - min) / (max - min), 3.0) + 3.0f * pow((x - min) / (max - min), 2));
+	}
+
+}
+
+float3 computeSpotLigth(float3 materialColor, Light light, PSInput input)
+{
+	float3  position = float3(input.worldPosition.x, input.worldPosition.y, input.worldPosition.z);
+
+	float3  lightDirection = normalize(light.position - position);
+
+	float cos = dot(lightDirection, light.direction);
+
+	float smoothstep = smoothStep(cosf(light.outerCutOff), cosf(light.cutOff), cos);
+	return computePointLight(materialColor, light, input) * smoothstep;
+}
+
+
 
 float3 computeLight(float3 materialColor, Light light, PSInput input)
 {
-    // TO-DO: Manage others types
-    if (light.type == 0) // POINT
-        return (computePointLight(materialColor, light, input));
-    else
-        return (float3(0.0f, 0.0f, 0.0f));
+	// TO-DO: Manage others types
+	if (light.type == 0) // POINT
+		return (computePointLight(materialColor, light, input));
+	else if (light.type == 2)
+		return (computeSpotLigth(materialColor, light, input));
+	else
+		return (float3(0.0f, 0.0f, 0.0f));
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
